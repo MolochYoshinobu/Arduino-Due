@@ -1,0 +1,172 @@
+#include <DueTimer.h>
+const byte StartPin=3;
+const byte StartBit=28;
+const byte DataPin=5;
+const byte DataBit=25;
+const byte ClkPin=7;
+const byte ClkBit=23;
+
+uint32_t DataReg;
+uint32_t ClkReg;
+uint32_t S_PlsReg;
+
+const int LongWordDataNo=4;
+const int DataLen=LongWordDataNo*32;
+uint32_t LongWordData[LongWordDataNo+1];
+
+//byte Data[(DataLen*2)+1];
+//byte Clk[(DataLen*2)+1];
+//byte S_Pls[(DataLen*2)+1];
+uint32_t Data[(DataLen*2)+1];
+
+byte DataNo=0;
+long ClkTime=1000000;
+boolean OutPutflg=false;
+byte cnt=0;
+  
+void setup() {
+  Serial.begin(115200);
+  pinMode(StartPin,OUTPUT);
+  pinMode(DataPin,OUTPUT);
+  pinMode(ClkPin,OUTPUT);
+  LongWordData[1]=0xAAAAAAAA;
+  LongWordData[2]=0x5555aaaa;
+  LongWordData[3]=0x12345678;
+  LongWordData[4]=0xffff0001;
+  Timer1.attachInterrupt(Timer1_handler);
+  Start();  
+}
+void Timer1_handler(void){
+  //Serial.println(Data[DataNo],BIN);
+  REG_PIOC_ODSR=Data[DataNo];
+  DataNo++;
+  if (DataNo>DataLen+1){
+    Timer1.stop();
+    OutPutflg=false;
+  }
+}
+void Start(){
+  int i;
+  int j;
+  byte k;
+  byte ReadData;
+  DataInput(); 
+  ClkInput();
+  digitalWrite(StartPin,HIGH);
+  digitalWrite(ClkPin,HIGH);
+  digitalWrite(DataPin,HIGH);
+  DataNo=0;
+  
+  for(j=1;j<=LongWordDataNo;j++){
+  //Serial.print(LongWordData[j],HEX);
+  //Serial.print(": ");
+    for(i=0;i<=31;i++){
+      
+      DataReg=((LongWordData[j]&(1<<(31-i)))>>(31-i))<<DataBit;
+      if(DataNo>=2){
+        DataReg |=(1<<StartBit);    
+      }
+      Data[DataNo]=DataReg;
+      DataReg ^=(1<<ClkReg);
+      if(DataNo>=2){
+        DataReg |=(1<<StartBit);    
+      }
+      Data[DataNo+1]=DataReg;
+      DataNo=DataNo+2;
+    }
+  }
+  Data[DataLen]=1;
+  OutPutflg=true;
+  DataNo=0;
+  Serial.println("信号を出力中");
+  Timer1.start(ClkTime);
+}
+void loop() {
+  if (OutPutflg==false){
+  Start();
+  }
+}
+
+void DataInput(){
+   int j;
+   int RecNo=9999;
+   String RecStr;
+   String RecStr2;
+   char RecChar[9];
+   char RecChar2[2];
+   bool flg=false;
+   Serial.println("現在の設定値");
+   for(j=1;j<=LongWordDataNo;j++){
+    Serial.print("No.");
+    Serial.print(j);
+    Serial.print(" :0x");
+    Serial.println(LongWordData[j],HEX);
+  }
+  Serial.print("クロック周期を設定する場合は0を入力、データを変更する場合はNo.を入力 :");
+    while(Serial.available()<2){
+      RecStr=Serial.readString();
+      if(RecStr.length()>1){
+        Serial.println(RecStr);
+        if(flg==false){
+          RecNo=RecStr.toInt();
+        }
+        if(RecNo==0){
+          break;
+        }
+        if(RecNo>LongWordDataNo){
+          Serial.print("クロック周期を設定する場合は0を入力、データを変更する場合はNo.を入力 :");
+        }else{
+          if (flg==false){
+            Serial.print("No.");
+            Serial.print(RecNo);
+            Serial.print("に設定するデータを入力してください:");
+            flg=true;
+          }else{    
+           if(RecStr.length()!=9){
+              RecStr.toCharArray(RecChar,9);
+              LongWordData[RecNo]=strtol(RecChar,NULL,16);
+            }else{
+              RecStr.toCharArray(RecChar,8);
+              RecStr2=RecStr.substring(7);
+              RecStr2.toCharArray(RecChar2,2);
+              LongWordData[RecNo]=(strtol(RecChar,NULL,16)<<4)+strtol(RecChar2,NULL,16);
+            }
+            Serial.println("現在の設定値");
+            for(j=1;j<=LongWordDataNo;j++){
+              Serial.print("No.");
+              Serial.print(j);
+              Serial.print(" :0x");
+              Serial.println(LongWordData[j],HEX);
+            }
+            Serial.print("クロック周期を設定する場合は0を入力、データを変更する場合はNo.を入力 :");
+            flg=false;
+          }
+      }
+     }
+    }
+}
+void ClkInput(){
+   String RecStr;
+   bool flg=false;
+   long SetTime;
+   Serial.print("現在のクロック周期の設定値：");
+   Serial.print(ClkTime);
+   Serial.println("μs");
+   Serial.print("信号を出力する場合は0を入力、クロック周期の設定は、値(μs)を入力 :");
+   while(Serial.available()<2){
+      RecStr=Serial.readString();
+      if(RecStr.length()>1){
+        Serial.println(RecStr);
+        SetTime=RecStr.toInt();
+        if(SetTime>0){
+          ClkTime=SetTime;
+          Serial.print("現在のクロック周期の設定値：");
+          Serial.print(ClkTime);
+          Serial.println("μs");
+          Serial.print("信号を出力する場合は0を入力、クロック周期の設定は、値(μs)を入力 :");
+          }else{
+            break;
+          }
+       }
+      }
+}
