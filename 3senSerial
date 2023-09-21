@@ -1,0 +1,208 @@
+#include <Portenta_H7_TimerInterrupt.h>
+#include <Portenta_H7_ISR_Timer.h>
+#include <Portenta_H7_ISR_Timer.hpp>
+volatile uint32_t* const GPIOD_MODER = (uint32_t *)0x58020000; // GPIO port mode register
+volatile uint32_t* const GPIOD_ODR = (uint32_t *)0x58020014; // GPIO port output data register
+arduino::UART AdditionalUartWithoutBreakout(PC_6, PC_7, NC, NC);
+Portenta_H7_Timer ITimer0(TIM1);
+
+//int dataFromRegister = 0;
+
+const byte StartPin=3;
+const byte StartBit=8;
+const byte DataPin=5;
+const byte DataBit=9;
+const byte ClkPin=7;
+const byte ClkBit=10;
+
+uint32_t DataReg;
+uint32_t ClkReg;
+uint32_t S_PlsReg;
+String RecStr;
+
+const int LongWordDataNo=4;
+const int DataLen=LongWordDataNo*32;
+uint32_t LongWordData[LongWordDataNo+1];
+
+//byte Data[(DataLen*2)+1];
+//byte Clk[(DataLen*2)+1];
+//byte S_Pls[(DataLen*2)+1];
+uint32_t Data[(DataLen*2)+1];
+
+byte DataNo=0;
+long ClkTime=1000000;
+boolean OutPutflg=false;
+byte cnt=0;
+  
+void setup() {
+  AdditionalUartWithoutBreakout.begin(115200);
+  AdditionalUartWithoutBreakout.setTimeout(100);
+  int32_t moder = *GPIOD_MODER;
+  moder |= (1 << 16); // set to 1 ->>PA8(D6)
+  moder &= ~(1 << 17); // set to 0->>PA8(D6)
+  moder |= (1 << 18); // set to 1 ->>PA9(D14)
+  moder &= ~(1 << 19); // set to 0->>PA9(D14)
+  moder |= (1 << 20); // set to 1 ->>PA10(D13)
+  moder &= ~(1 << 21); // set to 0->>PA10(D13)
+
+
+  *GPIOD_MODER = moder;
+  
+  LongWordData[1]=0xAAAAAAAA;
+  LongWordData[2]=0x5555aaaa;
+  LongWordData[3]=0x12345678;
+  LongWordData[4]=0xffff0001;
+  Start();  
+}
+
+void TimerHandler0(void) {
+   *GPIOD_ODR =Data[DataNo];
+    DataNo++;
+    if (DataNo>DataLen+1){
+      ITimer0.stopTimer();
+      OutPutflg=false;
+      //DataNo=0;
+    }
+}
+void Start(){
+  int i;
+  int j;
+  byte k;
+  byte ReadData;
+  
+  DataInput();
+  ClkInput();
+  DataReg=0;
+  for(j=1;j<=LongWordDataNo;j++){
+    //AdditionalUartWithoutBreakout.print(LongWordData[j],HEX);
+    //AdditionalUartWithoutBreakout.print(": ");
+    for(i=0;i<=31;i++){
+      
+      DataReg=((LongWordData[j]&(1<<(31-i)))>>(31-i))<<DataBit;
+      if(DataNo>=2){
+        DataReg |=(1<<StartBit);    
+      }
+      Data[DataNo]=DataReg;
+      DataReg ^=(1<<ClkReg);
+      //if(DataNo>=2){
+      //  DataReg |=(1<<StartBit);    
+      //}
+      //AdditionalUartWithoutBreakout.println(Data[DataNo],HEX);
+      Data[DataNo+1]=DataReg;
+      //AdditionalUartWithoutBreakout.println(Data[DataNo+1],HEX);
+
+      DataNo=DataNo+2;
+
+    }
+  }
+  Data[DataLen]=1;
+  OutPutflg=true;
+  DataNo=0;
+  AdditionalUartWithoutBreakout.println("信号を出力中");
+  AdditionalUartWithoutBreakout.flush();
+  ITimer0.attachInterruptInterval(ClkTime, TimerHandler0);
+}
+
+
+void loop() {
+  if (OutPutflg==false){
+  Start();
+  }
+}
+
+void DataInput(){
+   int j;
+   int RecNo=9999;
+   char RecChar[9];
+   char RecChar2[2];
+   String RecStr2;
+
+   AdditionalUartWithoutBreakout.println("現在の設定値");
+     for(j=1;j<=LongWordDataNo;j++){
+      AdditionalUartWithoutBreakout.print("No.");
+      AdditionalUartWithoutBreakout.print(j);
+      AdditionalUartWithoutBreakout.print(" :0x");
+      AdditionalUartWithoutBreakout.println(LongWordData[j],HEX);
+    }
+   AdditionalUartWithoutBreakout.print("クロック周期を設定する場合は0を入力、データを変更する場合はNo.を入力 :");
+   while(1){
+      Serialread();
+      RecNo=RecStr.toInt();
+      if(RecNo==0){break;}
+      if(RecNo>LongWordDataNo){
+        AdditionalUartWithoutBreakout.print("クロック周期を設定する場合は0を入力、データを変更する場合はNo.を入力 :");
+      }
+      else{
+        AdditionalUartWithoutBreakout.print("No.");
+        AdditionalUartWithoutBreakout.print(RecNo);
+        AdditionalUartWithoutBreakout.print("に設定するデータを入力してください:");   
+        Serialread();
+      
+        if(RecStr.length()<8){
+          RecStr.toCharArray(RecChar,8);
+          LongWordData[RecNo]=strtol(RecChar,NULL,16);
+        }
+        else{
+          RecStr.toCharArray(RecChar,8);
+          RecStr2=RecStr.substring(7);
+          RecStr2.toCharArray(RecChar2,2);
+          LongWordData[RecNo]=(strtol(RecChar,NULL,16)<<4)+strtol(RecChar2,NULL,16);
+        }
+        AdditionalUartWithoutBreakout.println("現在の設定値");
+        for(j=1;j<=LongWordDataNo;j++){
+          AdditionalUartWithoutBreakout.print("No.");
+          AdditionalUartWithoutBreakout.print(j);
+          AdditionalUartWithoutBreakout.print(" :0x");
+          AdditionalUartWithoutBreakout.println(LongWordData[j],HEX);
+        }
+        AdditionalUartWithoutBreakout.print("クロック周期を設定する場合は0を入力、データを変更する場合はNo.を入力 :");   
+        AdditionalUartWithoutBreakout.flush();
+      }
+    }
+}
+
+void ClkInput(){
+  long SetTime;
+  while(1){
+    AdditionalUartWithoutBreakout.print("現在のクロック周期の設定値：");
+    AdditionalUartWithoutBreakout.print(ClkTime);
+    AdditionalUartWithoutBreakout.println("μs");
+    AdditionalUartWithoutBreakout.print("信号を出力する場合は0を入力、クロック周期の設定は、値(μs)を入力 :");
+
+    Serialread();
+
+    SetTime=RecStr.toInt();
+    if(SetTime==0){break;}
+  
+    if(SetTime>0){
+      ClkTime=SetTime;
+    }
+  }
+}
+
+void Serialread(){
+  String input_data;
+  String output_data;
+  while(1){
+    if ( AdditionalUartWithoutBreakout.available() > 0 ) {
+      input_data = AdditionalUartWithoutBreakout.readString();
+      AdditionalUartWithoutBreakout.print(input_data);
+      if (input_data == "\b"){
+        AdditionalUartWithoutBreakout.print("\033[0K");
+        output_data = output_data.substring(0, output_data.length() - 1);
+        input_data = "";
+      }
+      else if (input_data == "\r") {
+        if (output_data == "") {}
+        else {
+          AdditionalUartWithoutBreakout.println();
+          RecStr=output_data;
+          break;
+        }
+      }
+    else {
+      output_data = output_data + input_data;
+      }
+    }     
+  }
+}
