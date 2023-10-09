@@ -1,0 +1,211 @@
+#include <DueTimer.h>
+
+// int PortNo[]={1,1,0,0,0,0,3,3,0,0,1,2,1,2,2,2,2,2,0,3,3,1};
+// int RegisterNo[]={13,12,10,11,12,13,5,4,8,9,25,28,29,25,24,23,22,21,28,7,8,27};
+ int PortNo[]={0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0};
+ int RegisterNo[]={16,24,23,22,6,4,3,2,17,18,19,20,15,16,1,0};
+ //uint32_t Data[4]={0,0,0,0};
+ uint32_t Data[2]={0,0};
+
+  
+void setup() {
+  int i,j,k;
+  int DataSize;
+  int RS422Size;
+  DataSize=sizeof(PortNo)/sizeof(PortNo[0]);
+  RS422Size=DataSize/2;
+  int RecData[RS422Size];
+  String RecStr;
+  String RecStr2[RS422Size];
+  REG_PIOA_PER=0xffffffff;
+  REG_PIOB_PER=0xffffffff;
+  REG_PIOA_PUER=0xffffffff;
+  REG_PIOB_PUER=0xffffffff;
+  REG_PIOA_OER=0xffffffff;
+  REG_PIOB_OER=0xffffffff;
+
+  RecStr="01011010";
+
+  Serial.begin(115200);
+  Serial.setTimeout(100);
+   for(i=1;i<=RS422Size;i++){
+     RecStr2[i-1]=RecStr.substring(i-1,i);
+     RecData[i-1]=RecStr2[i-1].toInt();  
+     //Serial.println(RecData[i-1],BIN);
+   }
+   j=0;
+  for(i=1;i<=RS422Size;i++){
+    //PortNo[]={0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0};
+    //RegisterNo[]={16,24,23,22,6,4,3,2,17,18,19,20,15,16,1,0};
+    Data[PortNo[j]]=Data[PortNo[j]] |= (RecData[i-1]<<RegisterNo[j]);
+    // Serial.print("[");
+    // Serial.print(RecData[i-1],BIN);
+    // Serial.print(":");
+    // Serial.print(RegisterNo[j]);
+    // Serial.print("]");
+    // Serial.println(RecData[i-1]<<RegisterNo[j],BIN);
+    j++;
+    Data[PortNo[j]]=Data[PortNo[j]] |= ((RecData[i-1] ^= 1)<<RegisterNo[j]);
+    // Serial.print("[");
+    // Serial.print((RecData[i-1] ^(1)),BIN);
+    // Serial.print(":");
+    // Serial.print(RegisterNo[j]);
+    // Serial.print("]");
+    // Serial.println((RecData[i-1] ^(1))<<RegisterNo[j],BIN);  
+    j++;
+  }
+ 
+  Serial.println(Data[0],BIN);
+  Serial.println(Data[1],BIN);
+  //Serial.println(Data[2],BIN);
+  //Serial.println(Data[3],BIN);
+  REG_PIOA_ODSR=Data[0];
+  REG_PIOB_ODSR=Data[1];
+  //REG_PIOC_ODSR=Data[2];
+  //REG_PIOD_ODSR=Data[3];
+
+}
+
+// void Start(){
+//   int i;
+//   int j;
+//   byte k;
+//   byte ReadData;
+//   DataInput(); 
+//   //ClkInput();
+//   digitalWrite(StartPin,HIGH);
+//   digitalWrite(ClkPin,HIGH);
+//   digitalWrite(DataPin,HIGH);
+//   DataNo=0;
+  
+//   for(j=1;j<=LongWordDataNo;j++){
+//   //Serial.print(LongWordData[j],HEX);
+//   //Serial.print(": ");
+//     for(i=0;i<=31;i++){
+      
+//       DataReg=((LongWordData[j]&(1<<(31-i)))>>(31-i))<<DataBit;
+//       if(DataNo>=2){
+//         DataReg |=(1<<StartBit);    
+//       }
+//       Data[DataNo]=DataReg;
+//       DataReg ^=(1<<ClkReg);
+//       if(DataNo>=2){
+//         DataReg |=(1<<StartBit);    
+//       }
+//       Data[DataNo+1]=DataReg;
+//       DataNo=DataNo+2;
+//     }
+//   }
+//   Data[DataLen]=1;
+//   OutPutflg=true;
+//   DataNo=0;
+//   Serial.println("信号を出力中");
+//   //Timer1.start(ClkTime);
+// }
+void loop(){
+
+}
+
+// void loop() {
+//   if (OutPutflg==false){
+//   Start();
+//   }
+// }
+
+// void DataInput(){
+//    int j;
+//    int RecNo=9999;
+//    char RecChar[9];
+//    char RecChar2[2];
+//    String RecStr2;
+
+//   Serial.println("現在の設定値");
+//      for(j=1;j<=LongWordDataNo;j++){
+//      Serial.print("No.");
+//      Serial.print(j);
+//      Serial.print(" :0x");
+//      Serial.println(LongWordData[j],HEX);
+//     }
+//   Serial.print("クロック周期を設定する場合は0を入力、データを変更する場合はNo.を入力 :");
+//    while(1){
+//       RecStr=Serialread_func();
+//       RecNo=RecStr.toInt();
+//       if(RecNo==0){break;}
+//       if(RecNo>LongWordDataNo){
+//        Serial.print("クロック周期を設定する場合は0を入力、データを変更する場合はNo.を入力 :");
+//       }
+//       else{
+//        Serial.print("No.");
+//        Serial.print(RecNo);
+//        Serial.print("に設定するデータを入力してください:");   
+//         RecStr=Serialread_func();
+      
+//         if(RecStr.length()<8){
+//           RecStr.toCharArray(RecChar,8);
+//           LongWordData[RecNo]=strtol(RecChar,NULL,16);
+//         }
+//         else{
+//           RecStr.toCharArray(RecChar,8);
+//           RecStr2=RecStr.substring(7);
+//           RecStr2.toCharArray(RecChar2,2);
+//           LongWordData[RecNo]=(strtol(RecChar,NULL,16)<<4)+strtol(RecChar2,NULL,16);
+//         }
+//        Serial.println("現在の設定値");
+//         for(j=1;j<=LongWordDataNo;j++){
+//          Serial.print("No.");
+//          Serial.print(j);
+//          Serial.print(" :0x");
+//          Serial.println(LongWordData[j],HEX);
+//         }
+//        Serial.print("クロック周期を設定する場合は0を入力、データを変更する場合はNo.を入力 :");   
+//        Serial.flush();
+//       }
+//     }
+// }
+
+// void ClkInput(){
+//   long SetTime;
+//   while(1){
+//    Serial.print("現在のクロック周期の設定値：");
+//    Serial.print(ClkTime);
+//    Serial.println("μs");
+//    Serial.print("信号を出力する場合は0を入力、クロック周期の設定は、値(μs)を入力 :");
+
+//     RecStr=Serialread_func();
+
+//     SetTime=RecStr.toInt();
+//     if(SetTime==0){break;}
+  
+//     if(SetTime>0){
+//       ClkTime=SetTime;
+//     }
+//   }
+// }
+
+// String Serialread_func(){
+//   String input_data;
+//   String output_data;
+//   while(1){
+//     if (Serial.available() > 0 ) {
+//       input_data =Serial.readString();
+//      Serial.print(input_data);
+//       if (input_data == "\b"){
+//        Serial.print("\033[0K");
+//         output_data = output_data.substring(0, output_data.length() - 1);
+//         input_data = "";
+//       }
+//       else if (input_data == "\r") {
+//         if (output_data == "") {}
+//         else {
+//          Serial.println();
+//           return output_data;
+//           break;
+//         }
+//       }
+//     else {
+//       output_data = output_data + input_data;
+//       }
+//     }     
+//   }
+// }
+
