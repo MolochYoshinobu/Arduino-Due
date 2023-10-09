@@ -19,8 +19,6 @@ void setup() {
   String RecStr2[RS422Size];
   REG_PIOA_PER=0xffffffff;
   REG_PIOB_PER=0xffffffff;
-  REG_PIOA_PUER=0xffffffff;
-  REG_PIOB_PUER=0xffffffff;
   REG_PIOA_OER=0xffffffff;
   REG_PIOB_OER=0xffffffff;
 
