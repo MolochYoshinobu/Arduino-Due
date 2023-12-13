@@ -1,0 +1,172 @@
+int Nowtime,Settime;
+void setup() {
+bool flg=false;
+int TestNo;
+Serial.begin(115200);
+Serial.setTimeout(100);
+pinMode(7,INPUT);  
+pinMode(20,OUTPUT);
+pinMode(21,OUTPUT);
+digitalWrite(20,HIGH);
+digitalWrite(21,HIGH);
+
+Serial.println("信号処理の基礎講座　その１");
+Serial.println("Test1:GPIOについて -digitalWrite-");
+Serial.println("Test2:GPIOについて -PortRegister-");
+Serial.println("Test3:割込みについて -チャタリング-");
+Serial.println("Test4:GPIOについて -noInterrupts-");
+Serial.println("Test5:GPIOについて -detachInterrupt-");
+Serial.println("Test6:GPIOについて -digitalRead-");
+Serial.println("Test7:GPIOについて -millisの活用-");
+
+Serial.print("SelectNo:");
+String RecStr=Serialread_func();
+TestNo=RecStr.toInt();
+
+switch(TestNo){
+  case 1:
+    Test1();
+    break;
+  case 2:
+    Test2();
+    break;
+  case 3:
+    Serial.println("Test3割込み開始");
+    attachInterrupt(7,Test3,FALLING);
+    break;
+  case 4:
+    Serial.println("Test4割込み開始");
+    attachInterrupt(7,Test4,FALLING);
+    break;
+  case 5:
+    Serial.println("Test5割込み開始");
+    attachInterrupt(7,Test5,FALLING);
+    break;
+  case 6:
+    Serial.println("Test6割込み開始");
+    attachInterrupt(7,Test6,FALLING);
+    break;
+  case 7:
+    Serial.println("Test7割込み開始");
+    attachInterrupt(7,Test7,FALLING);
+    break;
+  case 8:
+    Serial.println("Test8割込み開始");
+    attachInterrupt(7,Test7,FALLING);
+    break;
+}
+}
+
+void Test1(){
+  digitalWrite(20,LOW);
+  digitalWrite(21,LOW);
+  delay(100);
+  digitalWrite(20,HIGH);
+  digitalWrite(21,HIGH);
+}
+void Test2(){
+  uint32_t data=0;
+  data= (1<<12) | (1<<13);
+  REG_PIOB_ODSR ^=data;
+  delayMicroseconds(100);
+  REG_PIOB_ODSR ^=data;
+}
+
+void Test3(){
+  uint32_t data=0;
+  data= (1<<12) | (1<<13);
+  REG_PIOB_ODSR ^=data;
+  delayMicroseconds(50);
+  REG_PIOB_ODSR ^=data;
+  Serial.println("INIT!");
+}
+void Test4(){
+  noInterrupts();
+  uint32_t data=0;
+  data= (1<<12) | (1<<13);
+  REG_PIOB_ODSR ^=data;
+  delayMicroseconds(50);
+  REG_PIOB_ODSR ^=data;
+  Serial.println("INIT!");
+  interrupts();
+}
+void Test5(){
+  detachInterrupt(digitalPinToInterrupt(7));
+  uint32_t data=0;
+  data= (1<<12) | (1<<13);
+  REG_PIOB_ODSR ^=data;
+  delayMicroseconds(50);
+  REG_PIOB_ODSR ^=data;
+  Serial.println("INIT!");
+  attachInterrupt(7,Test5,FALLING);
+}
+void Test6(){
+  detachInterrupt(digitalPinToInterrupt(7));
+  delayMicroseconds(500);
+    if (digitalRead(7)==0){
+    uint32_t data=0;
+    data= (1<<12) | (1<<13);
+    REG_PIOB_ODSR ^=data;
+    delayMicroseconds(50);
+    REG_PIOB_ODSR ^=data;
+    Serial.println("INIT!");
+  }
+  attachInterrupt(7,Test6,FALLING);
+}
+
+void Test7(){ 
+   Nowtime=millis();
+   if((Nowtime-Settime)>500){
+    uint32_t data=0;
+    data= (1<<12) | (1<<13);
+    REG_PIOB_ODSR ^=data;
+    delayMicroseconds(50);
+    REG_PIOB_ODSR ^=data;
+    Serial.println("INIT!");
+    Settime=Nowtime;
+  }
+}
+void Test8(){
+   
+   Nowtime=millis();
+   if((Nowtime-Settime)>500 && digitalRead(7)==0){
+    uint32_t data=0;
+    data= (1<<12) | (1<<13);
+    REG_PIOB_ODSR ^=data;
+    delayMicroseconds(50);
+    REG_PIOB_ODSR ^=data;
+    Serial.println("INIT!");
+    Settime=Nowtime;
+  }
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+}
+
+String Serialread_func(){
+  String input_data;
+  String output_data;
+  while(1){
+    if (Serial.available() > 0 ) {
+      input_data =Serial.readString();
+     Serial.print(input_data);
+      if (input_data == "\b"){
+       Serial.print("\033[0K");
+        output_data = output_data.substring(0, output_data.length() - 1);
+        input_data = "";
+      }
+      else if (input_data == "\r") {
+        if (output_data == "") {}
+        else {
+         Serial.println();
+          return output_data;
+          break;
+        }
+      }
+    else {
+      output_data = output_data + input_data;
+      }
+    }     
+  }
+}
